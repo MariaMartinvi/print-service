@@ -85,6 +85,22 @@ def health():
     return {"ok": True, "mock": config.GELATO_MOCK}
 
 
+@app.get("/health/gelato", dependencies=[Depends(auth)])
+def health_gelato():
+    """Diagnóstico: prueba la API key contra Gelato y devuelve el detalle del error, sin exponer la clave."""
+    from .gelato import GelatoError
+    key = config.GELATO_API_KEY or ""
+    info = {"keyLength": len(key), "keyHasColon": ":" in key, "keyStripped": key == key.strip(),
+            "keyPrefix": key[:4], "keySuffix": key[-4:]}
+    try:
+        r = _gelato.list_catalogs()
+        info["catalogs"] = r if isinstance(r, list) else r.get("data", r)
+        info["ok"] = True
+    except GelatoError as e:
+        info.update(ok=False, status=e.status, body=e.body)
+    return info
+
+
 @app.get("/products/{product_uid}", dependencies=[Depends(auth)])
 def product(product_uid: str):
     return svc.product(product_uid)
