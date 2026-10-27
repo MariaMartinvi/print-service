@@ -5,6 +5,7 @@ Independiente del framework web. Las apps hablan en términos propios
 """
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any
 
@@ -138,8 +139,8 @@ class PrintService:
         if not app or not order_ref:
             raise ServiceError(422, "app y order_ref son obligatorios")
         existing = self.store.get_order_by_ref(app, order_ref)
-        if existing:
-            return existing  # idempotente: mismo pedido, misma respuesta
+        if existing and existing.get("status") != "failed":
+            return existing  # idempotente: mismo pedido, misma respuesta (un intento fallido se reintenta)
         g_items = _items(items)
         g_ship = _address(shipping)
         meta = dict(metadata or {})
@@ -271,7 +272,12 @@ class PrintService:
         try:
             return fn(*args)
         except GelatoError as e:
-            raise ServiceError(502 if e.status >= 500 or e.status == 0 else e.status, f"Gelato: {e.args[0]}")
+            detail = ""
+            if isinstance(e.body, dict):
+                errs = e.body.get("errors") or e.body.get("error") or e.body.get("details")
+                if errs:
+                    detail = " · " + json.dumps(errs, ensure_ascii=False)[:600]
+            raise ServiceError(502 if e.status >= 500 or e.status == 0 else e.status, f"Gelato: {e.args[0]}{detail}")
 
 
 def _merge_tracking(existing: list[dict], new: list[dict]) -> list[dict]:
