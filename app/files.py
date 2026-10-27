@@ -143,8 +143,15 @@ def _validate_pdf(data: bytes, spec: ProductSpec) -> ValidationResult:
         fonts = res.get("/Font") or {}
         for _, f in fonts.items():
             f = f.get_object()
+            if f.get("/Subtype") == "/Type3":
+                continue  # glifos dibujados en el propio PDF: siempre incrustada
+            if f.get("/Subtype") == "/Type0":
+                desc_fonts = f.get("/DescendantFonts")
+                f = desc_fonts[0].get_object() if desc_fonts else f
             desc = f.get("/FontDescriptor")
-            if desc is not None and not any(k in desc.get_object() for k in ("/FontFile", "/FontFile2", "/FontFile3")):
+            if desc is None:
+                fonts_ok = False  # fuente estándar no incrustada (p. ej. Helvetica base-14)
+            elif not any(k in desc.get_object() for k in ("/FontFile", "/FontFile2", "/FontFile3")):
                 fonts_ok = False
     except Exception:
         pass
