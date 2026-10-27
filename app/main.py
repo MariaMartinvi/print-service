@@ -101,6 +101,17 @@ def health_gelato():
     return info
 
 
+@app.get("/catalogs/{catalog_uid}", dependencies=[Depends(auth)])
+def catalog(catalog_uid: str):
+    return svc._g(svc.gelato.get_catalog, catalog_uid)
+
+
+@app.post("/catalogs/{catalog_uid}/search", dependencies=[Depends(auth)])
+def catalog_search(catalog_uid: str, body: dict):
+    return svc._g(svc.gelato.search_products, catalog_uid, body.get("attributeFilters") or {},
+                  int(body.get("limit", 50)), int(body.get("offset", 0)))
+
+
 @app.get("/products/{product_uid}", dependencies=[Depends(auth)])
 def product(product_uid: str):
     return svc.product(product_uid)
