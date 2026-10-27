@@ -17,6 +17,11 @@ SERVICE_API_KEY = env("SERVICE_API_KEY", "dev-key")
 # Segmento secreto de la URL del webhook: /webhooks/gelato/<WEBHOOK_SECRET>
 WEBHOOK_SECRET = env("WEBHOOK_SECRET", "dev-webhook")
 
+# A quién avisar cuando un pedido cambia de estado (p. ej. el backend de ChatSalsa, que manda el email al cliente).
+# Recibe POST JSON {orderReferenceId, status, tracking, reason} con la cabecera X-Service-Key = NOTIFY_KEY.
+NOTIFY_URL = env("NOTIFY_URL")
+NOTIFY_KEY = env("NOTIFY_KEY")
+
 # Base de datos: postgres://… (Supabase/Render) o ruta de fichero SQLite.
 DATABASE_URL = env("DATABASE_URL", "sqlite:///./print_service.db")
 

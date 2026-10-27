@@ -219,6 +219,7 @@ class PrintService:
         event = payload.get("event", "unknown")
         gid = payload.get("orderId")
         ref = payload.get("orderReferenceId") or ""
+        self._avisar(payload)
         orders = self.store.get_orders_by_gelato_id(gid) if gid else []
         if not orders and ":" in ref:
             app, _, order_ref = ref.partition(":")
@@ -253,6 +254,38 @@ class PrintService:
         return {"matched": len(orders), "event": event}
 
     # --- internos -----------------------------------------------------------------------
+    def _avisar(self, payload: dict) -> None:
+        """Reenvía a NOTIFY_URL los cambios que interesan a la app (enviado, entregado, fallido).
+        No depende de la base de datos: la app identifica el pedido por orderReferenceId."""
+        from . import config
+        if not config.NOTIFY_URL:
+            return
+        event = payload.get("event")
+        status, reason, tracking = None, None, []
+        if event == "order_status_updated":
+            status = simplify_status(payload.get("fulfillmentStatus"))
+            for it in payload.get("items", []):
+                for f in it.get("fulfillments", []):
+                    if f.get("trackingCode"):
+                        tracking.append({"code": f["trackingCode"], "url": f.get("trackingUrl"), "carrier": f.get("shipmentMethodName")})
+        elif event == "order_item_tracking_code_updated" and payload.get("trackingCode"):
+            status = "shipped"
+            tracking.append({"code": payload["trackingCode"], "url": payload.get("trackingUrl"), "carrier": payload.get("shipmentMethodName")})
+        elif event == "order_item_status_updated" and payload.get("status") == "failed":
+            status, reason = "failed", payload.get("comment") or payload.get("reason")
+        if status not in ("shipped", "delivered", "failed", "canceled"):
+            return
+        body = json.dumps({"orderReferenceId": payload.get("orderReferenceId"), "status": status,
+                           "tracking": tracking, "reason": reason, "gelatoOrderId": payload.get("orderId")}).encode()
+        try:
+            from urllib import request as _rq
+            req = _rq.Request(config.NOTIFY_URL, data=body, method="POST",
+                              headers={"Content-Type": "application/json", "X-Service-Key": config.NOTIFY_KEY or "",
+                                       "User-Agent": "print-service/0.1"})
+            _rq.urlopen(req, timeout=20).read()
+        except Exception as e:  # el aviso nunca debe romper el webhook
+            self.store.add_event("service", "notify_failed", {"error": str(e)})
+
     def _sync_from_gelato(self, local_id: str, raw: dict) -> dict:
         fields = {
             "gelato_order_id": raw.get("id"),
