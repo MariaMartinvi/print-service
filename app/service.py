@@ -158,12 +158,17 @@ class PrintService:
             payload["shipmentMethodUid"] = shipping_method
         if self.return_address:
             payload["returnAddress"] = self.return_address
-        local_id = str(uuid.uuid4())
-        self.store.insert_order({
-            "id": local_id, "app": app, "order_ref": order_ref, "customer_ref": customer_ref or "anon",
-            "order_type": payload["orderType"], "status": "pending_submit", "currency": payload["currency"],
-            "items": g_items, "shipping": g_ship, "metadata": meta,
-        })
+        if existing:  # reintento de un pedido fallido: misma fila, nuevo intento
+            local_id = existing["id"]
+            self.store.update_order(local_id, status="pending_submit", items=g_items, shipping=g_ship, metadata=meta)
+            self.store.add_event("service", "gelato_retry", {}, order_id=local_id)
+        else:
+            local_id = str(uuid.uuid4())
+            self.store.insert_order({
+                "id": local_id, "app": app, "order_ref": order_ref, "customer_ref": customer_ref or "anon",
+                "order_type": payload["orderType"], "status": "pending_submit", "currency": payload["currency"],
+                "items": g_items, "shipping": g_ship, "metadata": meta,
+            })
         try:
             raw = self._g(self.gelato.create_order, payload)
         except ServiceError as e:
