@@ -115,18 +115,18 @@ class PrintService:
         raw = self._g(self.gelato.quote, payload)
         quotes = []
         for q in raw.get("quotes", []):
-            products_total = round(sum(p["price"] for p in q["products"]), 2)
+            products_total = round(sum((p.get("price") or 0) for p in q.get("products") or []), 2)
             quotes.append({
-                "quoteId": q["id"], "fulfillmentCountry": q.get("fulfillmentCountry"),
+                "quoteId": q.get("id"), "fulfillmentCountry": q.get("fulfillmentCountry"),
                 "itemRefs": q.get("itemReferenceIds", []),
                 "productsTotal": products_total,
                 "currency": payload["currency"],
                 "shippingOptions": [
-                    {"uid": m["shipmentMethodUid"], "name": m["name"], "type": m.get("type"),
-                     "price": m["price"], "minDays": m["minDeliveryDays"], "maxDays": m["maxDeliveryDays"],
+                    {"uid": m.get("shipmentMethodUid"), "name": m.get("name"), "type": m.get("type"),
+                     "price": m.get("price", 0), "minDays": m.get("minDeliveryDays"), "maxDays": m.get("maxDeliveryDays"),
                      "minDate": m.get("minDeliveryDate"), "maxDate": m.get("maxDeliveryDate"),
-                     "total": round(products_total + m["price"], 2)}
-                    for m in sorted(q["shipmentMethods"], key=lambda m: m["price"])
+                     "total": round(products_total + (m.get("price") or 0), 2)}
+                    for m in sorted(q.get("shipmentMethods") or [], key=lambda m: m.get("price") or 0)
                 ],
             })
         return {"currency": payload["currency"], "quotes": quotes}

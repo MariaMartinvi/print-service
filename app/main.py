@@ -31,6 +31,13 @@ def auth(x_service_key: str = Header(default="")):
         raise HTTPException(401, "X-Service-Key inválida")
 
 
+@app.exception_handler(Exception)
+async def _any_error(_: Request, e: Exception):
+    import traceback
+    return JSONResponse(status_code=500, content={"error": f"{type(e).__name__}: {e}",
+                                                  "trace": traceback.format_exc().splitlines()[-4:]})
+
+
 @app.exception_handler(ServiceError)
 async def _service_error(_: Request, e: ServiceError):
     return JSONResponse(status_code=e.status, content={"error": e.message})
