@@ -44,6 +44,8 @@ class GelatoClient:
         req = request.Request(url, data=data, method=method)
         req.add_header("X-API-KEY", self.api_key)
         req.add_header("Accept", "application/json")
+        # Cloudflare (delante de gelatoapis.com) bloquea clientes sin User-Agent reconocible (error 1010)
+        req.add_header("User-Agent", "print-service/0.1 (+https://chatsalsa.com; python-urllib)")
         if data is not None:
             req.add_header("Content-Type", "application/json")
         try:
